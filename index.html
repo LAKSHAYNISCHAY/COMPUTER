@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        #quiz-container, #result-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        #quiz-container button, #result-container button {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #back-button, #next-button, #submit-button {
+            margin-right: 10px;
+        }
+        #back-button {
+            background-color: #6c757d;
+        }
+        #next-button {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        #submit-button {
+            background-color: #007BFF;
+        }
+        #show-answer-sheet, #retry-button, #download-button {
+            background-color: #28a745;
+        }
+        #show-answer-sheet:hover, #retry-button:hover, #download-button:hover {
+            background-color: #218838;
+        }
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .question {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .options {
+            margin: 10px 0;
+        }
+        .options div {
+            margin: 5px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .options div.selected {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .options div:hover {
+            background-color: #f0f0f0;
+        }
+        #score-card {
+            margin-bottom: 20px;
+        }
+        #score-card table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #score-card th, #score-card td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        #score-card th {
+            background-color: #f4f4f4;
+        }
+        #chart-container {
+            margin: 20px 0;
+            width: 100%;
+            height: 300px;
+        }
+        #bar-chart-container {
+            margin-bottom: 30px; /* Added space below bar chart */
+        }
+        #circular-chart-container {
+            margin-top: 20px; /* Added space above circular chart */
+        }
+        .answer-sheet {
+            margin: 20px 0;
+        }
+        .answer-sheet .question {
+            font-weight: bold;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .answer-sheet .answer {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .answer-sheet .correct {
+            background-color: #d4edda;
+        }
+        .answer-sheet .incorrect {
+            background-color: #f8d7da;
+        }
+        .answer-sheet .explanation {
+            font-style: italic;
+            color: #6c757d;
+        }
+        #buttons-container {
+            text-align: center;
+        }
+        #buttons-container button {
+            display: inline-block;
+            margin: 10px;
+        }
+        /* Ensure answer sheet opens in a new tab */
+        #show-answer-sheet {
+            background-color: #007BFF;
+        }
+        #show-answer-sheet:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <!-- Quiz Page -->
+    <div id="quiz-container">
+        <div id="timer">Time Left: <span id="timer-count">00:00</span></div>
+        <h1>Quiz Application</h1>
+        <div id="question-container">
+            <!-- Questions will be dynamically inserted here -->
+        </div>
+        <button id="back-button">Back</button>
+        <button id="next-button">Next</button>
+        <button id="submit-button">Submit</button>
+    </div>
+    
+    <!-- Results Page -->
+    <div id="result-container" style="display: none;">
+        <h1>Results</h1>
+        <div id="score-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Total Questions</th>
+                        <th>Correct Answers</th>
+                        <th>Incorrect Answers</th>
+                        <th>Unattempted Questions</th>
+                        <th>Overall Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="total-questions"></td>
+                        <td id="correct-count"></td>
+                        <td id="incorrect-count"></td>
+                        <td id="unattempted-count"></td>
+                        <td id="overall-score"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="bar-chart-container">
+            <canvas id="score-chart"></canvas>
+        </div>
+        <div id="circular-chart-container">
+            <canvas id="circular-chart"></canvas>
+        </div>
+        <div class="answer-sheet" id="answer-sheet"></div>
+        <div id="buttons-container">
+            <button id="show-answer-sheet">Show Answer Sheet</button>
+            <button id="retry-button">Retry</button>
+            <button id="download-button">Download Results</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const jsonUrl = 'https://raw.githubusercontent.com/LAKSHAYNISCHAY/Trial/main/Computer.json';
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let correctCount = 0;
+        let incorrectCount = 0;
+        let unattemptedCount = 0;
+        let timer;
+        let timeLeft = 0;
+
+        document.getElementById('next-button').addEventListener('click', () => {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                showQuestion();
+            }
+        });
+
+        document.getElementById('back-button').addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showQuestion();
+            }
+        });
+
+        document.getElementById('submit-button').addEventListener('click', submitQuiz);
+
+        function fetchQuestions() {
+            fetch(jsonUrl)
+                .then(response => response.json())
+                .then(data => {
+                    questions = data.questions;
+                    timeLeft = questions.length * 60; // 1 minute per question
+                    startTimer();
+                    showQuestion();
+                });
+        }
+
+        function startTimer() {
+            timer = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                document.getElementById('timer-count').textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                timeLeft--;
+                if (timeLeft < 0) {
+                    clearInterval(timer);
+                    submitQuiz();
+                }
+            }, 1000);
+        }
+
+        function showQuestion() {
+            if (currentQuestionIndex >= questions.length) {
+                submitQuiz();
+                return;
+            }
+            const question = questions[currentQuestionIndex];
+            const questionContainer = document.getElementById('question-container');
+            questionContainer.innerHTML = `
+                <div class="question">${question.question}</div>
+                <div class="options">
+                    ${Object.entries(question.options).map(([key, value]) => `
+                        <div data-value="${key}">
+                            ${value}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            // Add event listeners to options
+            document.querySelectorAll('.options div').forEach(option => {
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.options div').forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                    // Store the selected answer for submission
+                    questions[currentQuestionIndex].selectedAnswer = option.dataset.value;
+                });
+            });
+        }
+
+        function submitQuiz() {
+            clearInterval(timer);
+            questions.forEach(question => {
+                if (question.selectedAnswer === undefined) {
+                    unattemptedCount++;
+                } else if (question.selectedAnswer === question.correctAnswer) {
+                    correctCount++;
+                } else {
+                    incorrectCount++;
+                }
+            });
+
+            // Update score card
+            document.getElementById('total-questions').textContent = questions.length;
+            document.getElementById('correct-count').textContent = correctCount;
+            document.getElementById('incorrect-count').textContent = incorrectCount;
+            document.getElementById('unattempted-count').textContent = unattemptedCount;
+            document.getElementById('overall-score').textContent = `${((correctCount / questions.length) * 100).toFixed(2)}%`;
+
+            // Display charts
+            const ctxScore = document.getElementById('score-chart').getContext('2d');
+            new Chart(ctxScore, {
+                type: 'bar',
+                data: {
+                    labels: ['Correct', 'Incorrect', 'Unattempted'],
+                    datasets: [{
+                        data: [correctCount, incorrectCount, unattemptedCount],
+                        backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false
+                }
+            });
+
+            const ctxCircular = document.getElementById('circular-chart').getContext('2d');
+            new Chart(ctxCircular, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Correct', 'Incorrect', 'Unattempted'],
+                    datasets: [{
+                        data: [correctCount, incorrectCount, unattemptedCount],
+                        backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Generate answer sheet
+            const answerSheetHtml = questions.map((question, index) => `
+                <div class="question">${index + 1}. ${question.question}</div>
+                <div class="answer ${question.correctAnswer === question.selectedAnswer ? 'correct' : 'incorrect'}">
+                    Right Answer: ${question.options[question.correctAnswer]}
+                    <br>Your Answer: ${question.selectedAnswer ? question.options[question.selectedAnswer] : 'Not Attempted'}
+                    <br><div class="explanation">${question.explanation || ''}</div>
+                </div>
+            `).join('');
+
+            document.getElementById('answer-sheet').innerHTML = answerSheetHtml;
+
+            // Hide quiz container and show result container
+            document.getElementById('quiz-container').style.display = 'none';
+            document.getElementById('result-container').style.display = 'block';
+        }
+
+        document.getElementById('show-answer-sheet').addEventListener('click', () => {
+            const answerSheetWindow = window.open("", "AnswerSheet", "width=800,height=600");
+            answerSheetWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Answer Sheet</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .question { font-weight: bold; margin-top: 10px; }
+                        .answer { margin: 10px 0; padding: 10px; }
+                        .correct { background-color: #d4edda; }
+                        .incorrect { background-color: #f8d7da; }
+                        .explanation { font-style: italic; color: #6c757d; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Answer Sheet</h1>
+                    ${questions.map((question, index) => `
+                        <div class="question">${index + 1}. ${question.question}</div>
+                        <div class="answer ${question.correctAnswer === question.selectedAnswer ? 'correct' : 'incorrect'}">
+                            Right Answer: ${question.options[question.correctAnswer]}
+                            <br>Your Answer: ${question.selectedAnswer ? question.options[question.selectedAnswer] : 'Not Attempted'}
+                            <br><div class="explanation">${question.explanation || ''}</div>
+                        </div>
+                    `).join('')}
+                </body>
+                </html>
+            `);
+            answerSheetWindow.document.close();
+        });
+
+        document.getElementById('retry-button').addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        document.getElementById('download-button').addEventListener('click', () => {
+            const results = `Correct: ${correctCount}\nIncorrect: ${incorrectCount}\nUnattempted: ${unattemptedCount}\nOverall Score: ${((correctCount / questions.length) * 100).toFixed(2)}%`;
+            const blob = new Blob([results], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'results.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        fetchQuestions();
+    </script>
+</body>
+</html>
